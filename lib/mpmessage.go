@@ -1,4 +1,4 @@
-package main
+package lib
 
 import (
 	"github.com/vmihailenco/msgpack"
@@ -9,11 +9,19 @@ type MpMessage struct {
 	Ip     uint32 `msgpack:"ip"`
 }
 
-func NewMpMessage(receivedData []byte) (*MpMessage, error) {
+func GetMpMessage(receivedData []byte) (*MpMessage, error) {
 	mpmessage := new(MpMessage)
 	err := msgpack.Unmarshal(receivedData, &mpmessage)
 	if err != nil {
 		return mpmessage, err
 	}
 	return mpmessage, err
+}
+
+func (mpMessage *MpMessage) Serialize() []byte {
+	mpBytes, err := msgpack.Marshal(mpMessage)
+	if err != nil {
+		panic(err)
+	}
+	return mpBytes
 }

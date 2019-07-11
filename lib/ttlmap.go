@@ -1,6 +1,7 @@
-package main
+package lib
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -15,19 +16,35 @@ type TTLMap struct {
 	l sync.Mutex
 }
 
-func NewTTLMap(ln int, maxTTL int) (m *TTLMap) {
-	m = &TTLMap{m: make(map[string]*item, ln)}
+func NewTTLMap(ln int, maxTTL int, printTime int) (ttlmap *TTLMap) {
+	ttlmap = &TTLMap{m: make(map[string]*item, ln)}
 	go func() {
 		for now := range time.Tick(time.Second) {
-			m.l.Lock()
-			for k, v := range m.m {
+			ttlmap.l.Lock()
+			for k, v := range ttlmap.m {
 				if now.Unix()-v.lastAccess > int64(maxTTL) {
-					delete(m.m, k)
+					delete(ttlmap.m, k)
 				}
 			}
-			m.l.Unlock()
+			ttlmap.l.Unlock()
 		}
 	}()
+
+	go func() {
+		for range time.Tick(time.Duration(printTime) * time.Second) {
+			ttlmap.l.Lock()
+			fmt.Printf("TTLMap content... \n")
+			if ttlmap.Len() > 0 {
+				for k, v := range ttlmap.m {
+					fmt.Printf("key: %v | value: %v \n", k, v.value)
+				}
+			} else {
+				fmt.Printf("TTLMap is empty \n")
+			}
+			ttlmap.l.Unlock()
+		}
+	}()
+
 	return
 }
 

@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"mptcpserver/lib"
 	"net"
 	"os"
+	"time"
 )
 
 type MpTCPServer struct {
@@ -13,7 +15,7 @@ type MpTCPServer struct {
 	Port string
 }
 
-var ttlmap = NewTTLMap(1, 10)
+var ttlmap = lib.NewTTLMap(1, 10, 1)
 
 func (server *MpTCPServer) ListenAndServe(tcpaddr, tcpport string) error {
 
@@ -36,8 +38,7 @@ func (server *MpTCPServer) ListenAndServe(tcpaddr, tcpport string) error {
 			continue
 		}
 
-		fmt.Printf("MpTCPServer :: Accepted connection from %v \n", tcpconn.RemoteAddr())
-		HandleFunc(tcpconn)
+		go HandleFunc(tcpconn)
 	}
 }
 
@@ -45,6 +46,8 @@ func HandleFunc(tcpconn net.Conn) error {
 
 	tcpReader := bufio.NewReader(tcpconn)
 	tcpScan := bufio.NewScanner(tcpReader)
+
+	defer tcpconn.Close()
 
 	for {
 		scanned := tcpScan.Scan()
@@ -57,20 +60,17 @@ func HandleFunc(tcpconn net.Conn) error {
 			break
 		}
 
-		message, err := NewMpMessage(tcpScan.Bytes())
+		err := tcpconn.SetDeadline(time.Now().Add(time.Duration(5)))
+		if err != nil {
+			return err
+		}
+
+		message, err := lib.GetMpMessage(tcpScan.Bytes())
 		if err != nil {
 			return err
 		}
 
 		ttlmap.Put(message.Domain, message.Ip)
-
-		fmt.Printf("MpTCPServer :: Accepted from %v :: %v \n", tcpconn.RemoteAddr(), message)
-
-		//sentData := receivedData
-		//tcpWriter.WriteByte(sentData)
-		//tcpWriter.Flush()
-		//fmt.Printf("MpTCPServer :: Sent to %v :: %v \n", tcpconn.RemoteAddr(), sentData)
-
 	}
 	return nil
 }
@@ -84,9 +84,12 @@ func main() {
 	}
 
 	flag.StringVar(&addr, "tcpaddr", "0.0.0.0", "Set host address")
-	flag.StringVar(&port, "tcpport", "8080", "Set tcp port")
+	flag.StringVar(&port, "tcpport", "6000", "Set tcp port")
 	flag.Parse()
 
 	server := new(MpTCPServer)
-	server.ListenAndServe(addr, port)
+	err := server.ListenAndServe(addr, port)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
