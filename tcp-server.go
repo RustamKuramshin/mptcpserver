@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"github.com/vmihailenco/msgpack"
 	"net"
 	"os"
 )
@@ -14,10 +13,7 @@ type MpTCPServer struct {
 	Port string
 }
 
-type MpMessage struct {
-	Domain string `msgpack:"domain"`
-	Ip     uint32 `msgpack:"ip"`
-}
+var ttlmap = NewTTLMap(1, 10)
 
 func (server *MpTCPServer) ListenAndServe(tcpaddr, tcpport string) error {
 
@@ -26,7 +22,6 @@ func (server *MpTCPServer) ListenAndServe(tcpaddr, tcpport string) error {
 
 	fmt.Printf("MpTCPServer :: Start on host %v and port %v \n", server.Addr, server.Port)
 	listener, err := net.Listen("tcp", server.Addr+":"+server.Port)
-
 	if err != nil {
 		return err
 	}
@@ -62,12 +57,13 @@ func HandleFunc(tcpconn net.Conn) error {
 			break
 		}
 
-		var message MpMessage
-		receivedData := tcpScan.Bytes()
-		err := msgpack.Unmarshal(receivedData, &message)
+		message, err := NewMpMessage(tcpScan.Bytes())
 		if err != nil {
 			return err
 		}
+
+		ttlmap.Put(message.Domain, message.Ip)
+
 		fmt.Printf("MpTCPServer :: Accepted from %v :: %v \n", tcpconn.RemoteAddr(), message)
 
 		//sentData := receivedData
